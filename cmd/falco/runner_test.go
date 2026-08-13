@@ -411,7 +411,7 @@ func TestTester(t *testing.T) {
 			name:   "header subfield dealing test",
 			main:   "../../examples/testing/subfield-header-dealing/default.vcl",
 			filter: "*default.test.vcl",
-			passes: 10,
+			passes: 24,
 		},
 		{
 			name:   "synthetic vs obj.response",
