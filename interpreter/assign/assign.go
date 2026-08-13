@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"net"
-	"net/http"
 	"time"
 
 	"github.com/pkg/errors"
@@ -114,35 +113,37 @@ func Assign(left, right value.Value) error {
 			lv.IsNotSet = rv.IsNotSet
 		case value.IntegerType: // STRING = INTEGER
 			if right.IsLiteral() {
-				return errors.WithStack(fmt.Errorf("expected string constant, variable, or call"))
+				return errors.WithStack(fmt.Errorf("expected string constant, variable, or call, got %s literal", right.Type()))
 			}
 			rv := value.Unwrap[*value.Integer](right)
 			lv.Value = rv.String()
 			lv.IsNotSet = false
 		case value.FloatType: // STRING = FLOAT
 			if right.IsLiteral() {
-				return errors.WithStack(fmt.Errorf("expected string constant, variable, or call"))
+				return errors.WithStack(fmt.Errorf("expected string constant, variable, or call, got %s literal", right.Type()))
 			}
 			rv := value.Unwrap[*value.Float](right)
 			lv.Value = rv.String()
 			lv.IsNotSet = false
 		case value.RTimeType: // STRING = RTIME
 			if right.IsLiteral() {
-				return errors.WithStack(fmt.Errorf("expected string constant, variable, or call"))
+				return errors.WithStack(fmt.Errorf("expected string constant, variable, or call, got %s literal", right.Type()))
 			}
 			rv := value.Unwrap[*value.RTime](right)
 			lv.Value = rv.String()
 			lv.IsNotSet = false
 		case value.TimeType: // STRING = TIME
 			if right.IsLiteral() {
-				return errors.WithStack(fmt.Errorf("expected string constant, variable, or call"))
+				return errors.WithStack(fmt.Errorf("expected string constant, variable, or call, got %s literal", right.Type()))
 			}
 			rv := value.Unwrap[*value.Time](right)
-			lv.Value = rv.Value.Format(http.TimeFormat)
+			// Use the canonical representation so that an out of bounds TIME
+			// stringifies identically here and in operator.Concat
+			lv.Value = rv.String()
 			lv.IsNotSet = false
 		case value.BackendType: // STRING = BACKEND
 			if right.IsLiteral() {
-				return errors.WithStack(fmt.Errorf("expected string constant, variable, or call"))
+				return errors.WithStack(fmt.Errorf("expected string constant, variable, or call, got %s literal", right.Type()))
 			}
 			rv := value.Unwrap[*value.Backend](right)
 			lv.Value = rv.String()

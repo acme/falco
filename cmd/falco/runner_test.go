@@ -449,6 +449,12 @@ func TestTester(t *testing.T) {
 			filter: "*request_byte_reads.test.vcl",
 			passes: 2,
 		},
+		{
+			name:   "string coercion in equality operators",
+			main:   "../../examples/testing/string_coercion/default.vcl",
+			filter: "*string_coercion/default.test.vcl",
+			passes: 21,
+		},
 	}
 
 	for _, tt := range tests {
