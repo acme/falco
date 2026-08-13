@@ -66,6 +66,25 @@ func getBackendIP(resp *http.Response) value.Value {
 	return &value.IP{Value: ip}
 }
 
+// getBackendHost reads the "host" property from a backend declaration and
+// returns it verbatim as a STRING, matching Fastly's beresp.backend.host.
+// Returns a not-set STRING when the backend or host property is absent
+// (e.g. no backend request was made, such as on a cache hit).
+func getBackendHost(backend *value.Backend) (value.Value, error) {
+	if backend == nil {
+		return &value.String{IsNotSet: true}, nil
+	}
+	for _, p := range backend.Value.Properties {
+		if p.Key.Value != "host" {
+			continue
+		}
+		if s, ok := p.Value.(*ast.String); ok {
+			return &value.String{Value: s.Value}, nil
+		}
+	}
+	return &value.String{IsNotSet: true}, nil
+}
+
 func GetFastlyInfoVariable(ctx *context.Context, name string) (value.Value, error) {
 	switch name {
 	case FASTLY_INFO_H2_IS_PUSH:
