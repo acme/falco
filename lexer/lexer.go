@@ -466,13 +466,13 @@ func (l *Lexer) NextToken() token.Token {
 				return t
 			}
 		case isDigit(l.char):
-			num := l.readNumber()
-			// VCL has special type of "RTIME", it indicates relative-time.
-			// To parse it, we look up unit string after digit Literal
-			// and if "ms", "s", "m", "h", "d", "w", "y" character is found, it deals with RTIME token.
+			num, isFloat, rtimeEligible := l.readNumber()
+			// VCL has a special "RTIME" type (relative time) formed by a unit suffix
+			// ("ms", "s", "m", "h", "d", "w", "y"). Only plain decimal literals are
+			// eligible; hex and exponent literals are not (e.g. "0x1fs", "1e3s").
 			// https://developer.fastly.com/reference/vcl/types/rtime/
-			switch l.char {
-			case 'm':
+			switch {
+			case rtimeEligible && l.char == 'm':
 				if l.peekChar() == 's' { // "ms"
 					l.readChar()
 					t = newToken(token.RTIME, l.char, line, index)
@@ -481,10 +481,11 @@ func (l *Lexer) NextToken() token.Token {
 					t = newToken(token.RTIME, l.char, line, index)
 					t.Literal = num + "m" // minute
 				}
-			case 's', 'h', 'd', 'w', 'y': // second, hour, day, week, year
+			// second, hour, day, week, year
+			case rtimeEligible && (l.char == 's' || l.char == 'h' || l.char == 'd' || l.char == 'w' || l.char == 'y'):
 				t = newToken(token.RTIME, l.char, line, index)
 				t.Literal = num + string(l.char)
-			case ' ', '\t':
+			case rtimeEligible && (l.char == ' ' || l.char == '\t'):
 				// Fastly allows whitespace before the unit, e.g. `60 s` == `60s`.
 				if unit, consume, ok := l.peekSpacedRtimeUnit(); ok {
 					t = newToken(token.RTIME, l.char, line, index)
@@ -496,8 +497,7 @@ func (l *Lexer) NextToken() token.Token {
 				}
 				fallthrough
 			default:
-				// If literal contains ".", token should be FLOAT
-				if strings.Count(num, ".") == 1 {
+				if isFloat {
 					t = newToken(token.FLOAT, l.char, line, index)
 				} else {
 					t = newToken(token.INT, l.char, line, index)
@@ -534,8 +534,17 @@ func isLetter(r rune) bool {
 }
 
 func isDigit(r rune) bool {
-	// Digit allows "." character to parse literal is INTEGER of FLOAT.
+	// Includes '.' only so isLongStringDelimiter (which excludes '.') works;
+	// readNumber uses isDecimalDigit/isHexDigit for INT vs FLOAT classification.
 	return (r >= '0' && r <= '9') || r == '.'
+}
+
+func isDecimalDigit(r rune) bool {
+	return r >= '0' && r <= '9'
+}
+
+func isHexDigit(r rune) bool {
+	return (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')
 }
 
 func isLongStringDelimiter(r rune) bool {
