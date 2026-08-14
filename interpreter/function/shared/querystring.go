@@ -19,12 +19,12 @@ type QueryStrings struct {
 }
 
 func ParseQuery(qs string) *QueryStrings {
-	idx := strings.Index(qs, "?")
-	if idx == -1 {
+	prefix, query, found := strings.Cut(qs, "?")
+	if !found {
 		return &QueryStrings{Prefix: qs}
 	}
-	ret := &QueryStrings{Prefix: qs[0:idx]}
-	for _, token := range strings.Split(qs[idx+1:], "&") {
+	ret := &QueryStrings{Prefix: prefix}
+	for token := range strings.SplitSeq(query, "&") {
 		if name, val, found := strings.Cut(token, "="); found {
 			ret.Params = append(ret.Params, Param{Name: name, Value: val, HasValue: true})
 		} else {

@@ -64,12 +64,12 @@ func Querystring_sort(ctx *context.Context, args ...value.Value) (value.Value, e
 }
 
 func querystringSort(input string, uniqueKeys bool) string {
-	idx := strings.Index(input, "?")
-	if idx == -1 {
+	prefix, query, found := strings.Cut(input, "?")
+	if !found {
 		return input
 	}
 
-	tokens := qsScan(input[idx+1:])
+	tokens := qsScan(query)
 
 	// The parameter limit includes empty tokens and bypasses deduplication.
 	if len(tokens) >= Querystring_sort_ParameterLimit {
@@ -84,7 +84,7 @@ func querystringSort(input string, uniqueKeys bool) string {
 		tokens = qsUnique(tokens)
 	}
 
-	return qsEmit(input[:idx], qsSortTokens(tokens))
+	return qsEmit(prefix, qsSortTokens(tokens))
 }
 
 // qsUnique keeps the first token for each distinct name.
