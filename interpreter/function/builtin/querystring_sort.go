@@ -3,6 +3,8 @@
 package builtin
 
 import (
+	"strings"
+
 	"github.com/ysugimoto/falco/v2/interpreter/context"
 	"github.com/ysugimoto/falco/v2/interpreter/function/errors"
 	"github.com/ysugimoto/falco/v2/interpreter/function/shared"
@@ -10,6 +12,11 @@ import (
 )
 
 const Querystring_sort_Name = "querystring.sort"
+
+// Fastly returns the URL untouched once its query string holds this many
+// parameters, so neither the sort nor only_unique_keys is applied. Empty
+// parameters count toward the limit.
+const Querystring_sort_ParameterLimit = 32
 
 var Querystring_sort_ArgumentTypes = []value.Type{value.StringType, value.BooleanType}
 
@@ -37,6 +44,13 @@ func Querystring_sort(ctx *context.Context, args ...value.Value) (value.Value, e
 	}
 
 	u := value.Unwrap[*value.String](args[0])
+
+	if idx := strings.Index(u.Value, "?"); idx != -1 {
+		if strings.Count(u.Value[idx+1:], "&")+1 >= Querystring_sort_ParameterLimit {
+			return &value.String{Value: u.Value}, nil
+		}
+	}
+
 	query, err := shared.ParseQuery(u.Value)
 	if err != nil {
 		return value.Null, errors.New(

@@ -3,12 +3,44 @@
 package builtin
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/ysugimoto/falco/v2/interpreter/context"
 	"github.com/ysugimoto/falco/v2/interpreter/value"
 )
+
+// descendingParams builds "/q?pNN=1&...&p01=1" so that sorting is observable.
+func descendingParams(n int) string {
+	params := make([]string, n)
+	for i := range params {
+		params[i] = fmt.Sprintf("p%02d=1", n-i)
+	}
+	return "/q?" + strings.Join(params, "&")
+}
+
+func ascendingParams(n int) string {
+	params := make([]string, n)
+	for i := range params {
+		params[i] = fmt.Sprintf("p%02d=1", i+1)
+	}
+	return "/q?" + strings.Join(params, "&")
+}
+
+// repeatedKeys builds 33 tokens: three keys repeated eleven times each.
+func repeatedKeys() string {
+	var tokens []string
+	for i := range 11 {
+		tokens = append(tokens,
+			fmt.Sprintf("c=%02d", i*3+1),
+			fmt.Sprintf("b=%02d", i*3+2),
+			fmt.Sprintf("a=%02d", i*3+3),
+		)
+	}
+	return "/q?" + strings.Join(tokens, "&")
+}
 
 // Fastly built-in function testing implementation of querystring.sort
 // Arguments may be:
@@ -81,6 +113,29 @@ func Test_Querystring_sort(t *testing.T) {
 				&value.Boolean{Value: true},
 			},
 			expect: &value.String{Value: "/foo?A=1&a=2"},
+		},
+		{
+			name:   "sorts up to 31 parameters",
+			args:   []value.Value{&value.String{Value: descendingParams(31)}},
+			expect: &value.String{Value: ascendingParams(31)},
+		},
+		{
+			name:   "leaves 32 or more parameters untouched",
+			args:   []value.Value{&value.String{Value: descendingParams(32)}},
+			expect: &value.String{Value: descendingParams(32)},
+		},
+		{
+			name:   "counts empty tokens toward the parameter limit",
+			args:   []value.Value{&value.String{Value: descendingParams(30) + "&&"}},
+			expect: &value.String{Value: descendingParams(30) + "&&"},
+		},
+		{
+			name: "does not apply only_unique_keys over the parameter limit",
+			args: []value.Value{
+				&value.String{Value: repeatedKeys()},
+				&value.Boolean{Value: true},
+			},
+			expect: &value.String{Value: repeatedKeys()},
 		},
 	}
 
