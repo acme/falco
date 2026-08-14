@@ -106,6 +106,30 @@ func (q *QueryStrings) Clean() {
 	q.Items = cleaned
 }
 
+// Unique keeps only the first parameter for each name, which is how Fastly
+// implements the only_unique_keys argument of querystring.sort.
+//
+// A name that carries a value and the same name with no value at all are
+// separate parameters and neither displaces the other, so "b=1&b" keeps both.
+// Two valueless copies of a name are duplicates of each other though, so
+// "b&b" collapses to one.
+func (q *QueryStrings) Unique() {
+	seen := make(map[string]struct{})
+	var unique []*QueryString
+	for _, v := range q.Items {
+		if v.Value == nil {
+			if _, ok := seen[v.Key]; ok {
+				continue
+			}
+			seen[v.Key] = struct{}{}
+		} else if len(v.Value) > 1 {
+			v.Value = v.Value[:1]
+		}
+		unique = append(unique, v)
+	}
+	q.Items = unique
+}
+
 func (q *QueryStrings) Filter(filter func(name string) bool) {
 	var filtered []*QueryString
 	for _, v := range q.Items {

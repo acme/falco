@@ -11,11 +11,11 @@ import (
 
 const Querystring_sort_Name = "querystring.sort"
 
-var Querystring_sort_ArgumentTypes = []value.Type{value.StringType}
+var Querystring_sort_ArgumentTypes = []value.Type{value.StringType, value.BooleanType}
 
 func Querystring_sort_Validate(args []value.Value) error {
-	if len(args) != 1 {
-		return errors.ArgumentNotEnough(Querystring_sort_Name, 1, args)
+	if len(args) < 1 || len(args) > 2 {
+		return errors.ArgumentNotInRange(Querystring_sort_Name, 1, 2, args)
 	}
 	for i := range args {
 		if args[i].Type() != Querystring_sort_ArgumentTypes[i] {
@@ -27,6 +27,7 @@ func Querystring_sort_Validate(args []value.Value) error {
 
 // Fastly built-in function implementation of querystring.sort
 // Arguments may be:
+// - STRING, BOOL
 // - STRING
 // Reference: https://developer.fastly.com/reference/vcl/functions/query-string/querystring-sort/
 func Querystring_sort(ctx *context.Context, args ...value.Value) (value.Value, error) {
@@ -41,6 +42,13 @@ func Querystring_sort(ctx *context.Context, args ...value.Value) (value.Value, e
 		return value.Null, errors.New(
 			Querystring_sort_Name, "Failed to parse urquery: %s, error: %s", u.Value, err.Error(),
 		)
+	}
+
+	// The optional only_unique_keys argument filters out repeated keys.
+	// Fastly keeps the first occurrence in input order, so this must run
+	// before sorting.
+	if len(args) > 1 && value.Unwrap[*value.Boolean](args[1]).Value {
+		query.Unique()
 	}
 
 	query.Sort(shared.SortAsc)

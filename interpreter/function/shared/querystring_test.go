@@ -234,6 +234,95 @@ func TestQueryStringsClean(t *testing.T) {
 	}
 }
 
+func TestQueryStringsUnique(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		expect *QueryStrings
+	}{
+		{
+			name:  "keeps the first occurrence of each repeated key",
+			input: "/?a=7&a=2&a=1&b=5&b=3",
+			expect: &QueryStrings{
+				Prefix: "/",
+				Items: []*QueryString{
+					{Key: "a", Value: []string{"7"}},
+					{Key: "b", Value: []string{"5"}},
+				},
+			},
+		},
+		{
+			name:  "leaves already-unique keys untouched",
+			input: "/?b=1&a=2",
+			expect: &QueryStrings{
+				Prefix: "/",
+				Items: []*QueryString{
+					{Key: "b", Value: []string{"1"}},
+					{Key: "a", Value: []string{"2"}},
+				},
+			},
+		},
+		{
+			name:  "a valueless parameter does not collide with a valued one",
+			input: "/?b=1&b&a=2",
+			expect: &QueryStrings{
+				Prefix: "/",
+				Items: []*QueryString{
+					{Key: "b", Value: []string{"1"}},
+					{Key: "b", Value: nil},
+					{Key: "a", Value: []string{"2"}},
+				},
+			},
+		},
+		{
+			name:  "repeated valueless parameters collapse to one",
+			input: "/?b&b&a=2",
+			expect: &QueryStrings{
+				Prefix: "/",
+				Items: []*QueryString{
+					{Key: "b", Value: nil},
+					{Key: "a", Value: []string{"2"}},
+				},
+			},
+		},
+		{
+			name:  "the empty key is deduplicated too",
+			input: "/?=1&=2&a=3",
+			expect: &QueryStrings{
+				Prefix: "/",
+				Items: []*QueryString{
+					{Key: "", Value: []string{"1"}},
+					{Key: "a", Value: []string{"3"}},
+				},
+			},
+		},
+		{
+			name:  "deduplication is case sensitive",
+			input: "/?A=1&a=2",
+			expect: &QueryStrings{
+				Prefix: "/",
+				Items: []*QueryString{
+					{Key: "A", Value: []string{"1"}},
+					{Key: "a", Value: []string{"2"}},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			q, err := ParseQuery(tt.input)
+			if err != nil {
+				t.Fatalf("Unexpected parse query error: %s", err.Error())
+			}
+			q.Unique()
+			if diff := cmp.Diff(tt.expect, q); diff != "" {
+				t.Errorf("Result unmatch: diff=: %s", diff)
+			}
+		})
+	}
+}
+
 func TestQueryStringsSort(t *testing.T) {
 	tests := []struct {
 		input  string

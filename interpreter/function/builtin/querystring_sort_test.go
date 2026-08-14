@@ -12,30 +12,91 @@ import (
 
 // Fastly built-in function testing implementation of querystring.sort
 // Arguments may be:
+// - STRING, BOOL
 // - STRING
 // Reference: https://developer.fastly.com/reference/vcl/functions/query-string/querystring-sort/
 func Test_Querystring_sort(t *testing.T) {
 	tests := []struct {
-		input  *value.String
+		name   string
+		args   []value.Value
 		expect *value.String
 	}{
-		{input: &value.String{Value: "foo?b=1&a=2"}, expect: &value.String{Value: "foo?a=2&b=1"}},
+		{
+			name:   "sorts parameters by name",
+			args:   []value.Value{&value.String{Value: "foo?b=1&a=2"}},
+			expect: &value.String{Value: "foo?a=2&b=1"},
+		},
+		{
+			name: "only_unique_keys=false behaves like the single argument form",
+			args: []value.Value{
+				&value.String{Value: "foo?b=1&a=2"},
+				&value.Boolean{Value: false},
+			},
+			expect: &value.String{Value: "foo?a=2&b=1"},
+		},
+		{
+			name: "only_unique_keys drops repeated keys",
+			args: []value.Value{
+				&value.String{Value: "/test?a=7&a=2&a=1&b=5&b=3"},
+				&value.Boolean{Value: true},
+			},
+			expect: &value.String{Value: "/test?a=7&b=5"},
+		},
+		{
+			name: "only_unique_keys keeps the first occurrence in input order",
+			args: []value.Value{
+				&value.String{Value: "/foo?a=2&a=1"},
+				&value.Boolean{Value: true},
+			},
+			expect: &value.String{Value: "/foo?a=2"},
+		},
+		{
+			name: "only_unique_keys dedupes before sorting",
+			args: []value.Value{
+				&value.String{Value: "/foo?b=1&a=2&b=3"},
+				&value.Boolean{Value: true},
+			},
+			expect: &value.String{Value: "/foo?a=2&b=1"},
+		},
+		{
+			name: "only_unique_keys collapses repeated valueless parameters",
+			args: []value.Value{
+				&value.String{Value: "/foo?b&b&a=2"},
+				&value.Boolean{Value: true},
+			},
+			expect: &value.String{Value: "/foo?a=2&b"},
+		},
+		{
+			name: "only_unique_keys dedupes the empty key",
+			args: []value.Value{
+				&value.String{Value: "/foo?=1&=2&a=3"},
+				&value.Boolean{Value: true},
+			},
+			expect: &value.String{Value: "/foo?=1&a=3"},
+		},
+		{
+			name: "only_unique_keys is case sensitive",
+			args: []value.Value{
+				&value.String{Value: "/foo?A=1&a=2"},
+				&value.Boolean{Value: true},
+			},
+			expect: &value.String{Value: "/foo?A=1&a=2"},
+		},
 	}
 
-	for i, tt := range tests {
-		ret, err := Querystring_sort(
-			&context.Context{},
-			tt.input,
-		)
-		if err != nil {
-			t.Errorf("[%d] Unexpected error: %s", i, err)
-		}
-		if ret.Type() != value.StringType {
-			t.Errorf("[%d] Unexpected return type, expect=STRING, got=%s", i, ret.Type())
-		}
-		v := value.Unwrap[*value.String](ret)
-		if diff := cmp.Diff(v, tt.expect); diff != "" {
-			t.Errorf("[%d] Return value unmatch, diff: %s", i, diff)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ret, err := Querystring_sort(&context.Context{}, tt.args...)
+			if err != nil {
+				t.Fatalf("Unexpected error: %s", err)
+			}
+			if ret.Type() != value.StringType {
+				t.Errorf("Unexpected return type, expect=STRING, got=%s", ret.Type())
+			}
+			v := value.Unwrap[*value.String](ret)
+			if diff := cmp.Diff(v, tt.expect); diff != "" {
+				t.Errorf("Return value unmatch, diff: %s", diff)
+			}
+		})
 	}
 }
